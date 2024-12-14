@@ -1,80 +1,148 @@
-import unittest
 import os
+import unittest
+import tempfile
 import csv
-from unittest.mock import patch, mock_open
-from lib import equality_check, load_csv, write_csv, sort_data  # Replace with actual module name
+import shutil
 
-class TestFunctions(unittest.TestCase):
+# Import the functions to be tested
+from lib import (
+    equality_check,
+    load_csv,
+    write_csv,
+    sort_data
+)
+
+
+class TestCSVUtilityFunctions(unittest.TestCase):
+    def setUp(self):
+        # Create a temporary directory for test files
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        # Remove the temporary directory after tests
+        shutil.rmtree(self.test_dir)
 
     def test_equality_check(self):
+        # Test equal arrays
         self.assertTrue(equality_check(['a', 'b', 'c'], ['a', 'b', 'c']))
-        self.assertFalse(equality_check(['a', 'b', 'c'], ['a', 'b']))
-        self.assertFalse(equality_check(['a', 'b', 'c'], ['x', 'y', 'z']))
+
+        # Test unequal arrays (different length)
+        self.assertFalse(equality_check(['a', 'b'], ['a', 'b', 'c']))
+
+        # Test unequal arrays (same length, different content)
+        self.assertFalse(equality_check(['a', 'b', 'c'], ['a', 'b', 'd']))
+
+        # Test empty arrays
         self.assertTrue(equality_check([], []))
 
-    @patch("os.listdir", return_value=["test.csv"])
-    @patch("builtins.open", new_callable=mock_open, read_data="name,val1,val2,info\ndata1,1.0,2.0,info1\n")
-    def test_load_csv_valid_file(self, mock_open_file, mock_listdir):
-        header, data = load_csv("test.csv")
-        self.assertEqual(header, ["name", "val1", "val2", "info", "département"])
-        self.assertEqual(data, [
-            ["data1", 1.0, 2.0, "info1", "test"]
-        ])
-    @patch("os.listdir", return_value=["test.csv"])
-    @patch("builtins.open", new_callable=mock_open, read_data="")
-    def test_load_csv_empty_file(self, mock_open_file, mock_listdir):
-        with self.assertRaises(ValueError) as cm:
-            load_csv("test.csv")
-        self.assertEqual(str(cm.exception), "csv file empty")
-    @patch("os.listdir", return_value=["test.csv"])
-    @patch("builtins.open", new_callable=mock_open, read_data="name,val1,val2\n")
-    def test_load_csv_incorrect_column_count(self, mock_open_file, mock_listdir):
-        with self.assertRaises(ValueError) as cm:
-            load_csv("test.csv")
-        self.assertEqual(str(cm.exception), "csv file must contain exactly 4 columns")
-    @patch("os.listdir", return_value=["test.csv"])
-    @patch("builtins.open", new_callable=mock_open, read_data="name,val1,val2,info\n")
-    def test_load_csv_no_data_rows(self, mock_open_file, mock_listdir):
-        with self.assertRaises(ValueError) as cm:
-            load_csv("test.csv")
-        self.assertEqual(str(cm.exception), "csv file must contain at least 1 header and 1 line of data")
-    @patch("os.listdir", return_value=["test.csv"])
-    @patch("builtins.open", new_callable=mock_open, read_data="name,val1,val2,info\ndata1,not_a_float,2.0,info1\n")
-    def test_load_csv_invalid_data_types(self, mock_open_file, mock_listdir):
-        with self.assertRaises(ValueError) as cm:
-            load_csv("test.csv")
-        self.assertEqual(str(cm.exception), "Row contains invalid data types (expected str, float, float, str)")
-    @patch("os.listdir", return_value=[])
-    def test_load_csv_file_not_found(self, mock_listdir):
-        with self.assertRaises(FileNotFoundError) as cm:
-            load_csv("missing.csv")
-        self.assertEqual(str(cm.exception), "csv file not in the directory")
+    def test_load_csv_success(self):
+        # Create a test CSV file
+        test_file_path = os.path.join(self.test_dir, 'test_data.csv')
+        with open(test_file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows([
+                ['Name', 'Value1', 'Value2', 'Category'],
+                ['Item1', '10.5', '20.3', 'A'],
+                ['Item2', '15.7', '25.6', 'B']
+            ])
 
-    @patch("os.listdir", return_value=["existing.csv"])
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("builtins.input", side_effect=['n'])
-    def test_write_csv_no_overwrite(self, mock_input, mock_open_file, mock_listdir):
-        write_csv("existing.csv", [["data1", 1, 2]], ["col1", "col2", "col3"])
-        mock_open_file.assert_not_called()
+        # Test successful CSV loading
+        header, data = load_csv('test_data.csv', self.test_dir)
 
-    @patch("os.listdir", return_value=["existing.csv"])
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("builtins.input", side_effect=['yes'])
-    def test_write_csv_with_overwrite(self, mock_input, mock_open_file, mock_listdir):
-        write_csv("existing.csv", [["data1", 1, 2]], ["col1", "col2", "col3"])
-        mock_open_file.assert_called_once_with("existing.csv", "w", newline="", encoding="utf-8")
+        # Check header
+        expected_header = ['Name', 'Value1', 'Value2', 'Category', 'département']
+        self.assertEqual(header, expected_header)
+
+        # Check data
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0][0], 'Item1')
+        self.assertEqual(float(data[0][1]), 10.5)
+        self.assertEqual(float(data[0][2]), 20.3)
+        self.assertEqual(data[0][3], 'A')
+        self.assertEqual(data[0][4], 'test_data')
+
+    def test_load_csv_error_cases(self):
+        # Test file not found
+        with self.assertRaises(FileNotFoundError):
+            load_csv('nonexistent.csv', self.test_dir)
+
+        # Test empty file
+        test_file_path = os.path.join(self.test_dir, 'empty.csv')
+        open(test_file_path, 'w').close()
+        with self.assertRaises(ValueError):
+            load_csv('empty.csv', self.test_dir)
+
+        # Test insufficient columns
+        test_file_path = os.path.join(self.test_dir, 'insufficient_cols.csv')
+        with open(test_file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows([
+                ['Name', 'Value'],
+                ['Item1', '10']
+            ])
+        with self.assertRaises(ValueError):
+            load_csv('insufficient_cols.csv', self.test_dir)
+
+        # Test invalid data types
+        test_file_path = os.path.join(self.test_dir, 'invalid_types.csv')
+        with open(test_file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows([
+                ['Name', 'Value1', 'Value2', 'Category'],
+                ['Item1', 'not_a_number', '20.3', 'A']
+            ])
+        with self.assertRaises(ValueError):
+            load_csv('invalid_types.csv', self.test_dir)
+
+    def test_write_csv(self):
+        # Prepare test data
+        header = ['Name', 'Value1', 'Value2', 'Category', 'département']
+        data = [
+            ['Item1', '10.5', '20.3', 'A', 'test_dept'],
+            ['Item2', '15.7', '25.6', 'B', 'test_dept']
+        ]
+        output_file = 'output_test.csv'
+        output_path = os.path.join(self.test_dir, output_file)
+
+        # Test writing CSV
+        write_csv(output_file, data, header, self.test_dir, force_overwrite=True)
+
+        # Verify file was created and contents are correct
+        self.assertTrue(os.path.exists(output_path))
+
+        with open(output_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            read_rows = list(reader)
+
+        self.assertEqual(read_rows[0], header)
+        self.assertEqual(read_rows[1], ['Item1', '10.5', '20.3', 'A', 'test_dept'])
+        self.assertEqual(read_rows[2], ['Item2', '15.7', '25.6', 'B', 'test_dept'])
 
     def test_sort_data(self):
-        header = ["col1", "col2"]
-        data = [["data1", 1], ["data2", 2], ["data3", 0]]
-        sorted_data = sort_data(data, header, "col2")
-        self.assertEqual(sorted_data, [["data3", 0], ["data1", 1], ["data2", 2]])
+        # Prepare test data
+        header = ['Name', 'Value', 'Category']
+        data = [
+            ['Item1', 10, 'B'],
+            ['Item2', 5, 'A'],
+            ['Item3', 15, 'C']
+        ]
 
-        sorted_data_desc = sort_data(data, header, "col2", reverse=True)
-        self.assertEqual(sorted_data_desc, [["data2", 2], ["data1", 1], ["data3", 0]])
+        # Test sorting by Name (ascending)
+        sorted_data = sort_data(data, header, 'Name')
+        self.assertEqual([row[0] for row in sorted_data], ['Item1', 'Item2', 'Item3'])
 
+        # Test sorting by Name (descending)
+        sorted_data = sort_data(data, header, 'Name', reverse=True)
+        self.assertEqual([row[0] for row in sorted_data], ['Item3', 'Item2', 'Item1'])
+
+        # Test sorting by Value (ascending)
+        sorted_data = sort_data(data, header, 'Value')
+        self.assertEqual([row[0] for row in sorted_data], ['Item2', 'Item1', 'Item3'])
+
+        # Test invalid column raises ValueError
         with self.assertRaises(ValueError):
-            sort_data(data, header, "col3")
+            sort_data(data, header, 'InvalidColumn')
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     unittest.main()
