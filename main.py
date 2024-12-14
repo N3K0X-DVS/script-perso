@@ -99,3 +99,14 @@ class CSVShell(cmd.Cmd):
             write_csv(choix, self.data, self.header, self.directory)
         else:
             raise AttributeError('file does not have the correct extension')
+def main():
+    parser = argparse.ArgumentParser(description='CSV-Nexus Shell')
+    parser.add_argument('input')
+
+    arg = parser.parse_args()
+
+    CsvNexusShell(arg.input).cmdloop()
+
+
+if __name__ == '__main__':
+    main()
