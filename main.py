@@ -60,7 +60,8 @@ class CSVShell(cmd.Cmd):
             return
         if not self.data:
             return
-        print(self.data, self.header)
+        print(self.header)
+        [print(row) for row in self.data]
 
     def do_sort(self, line):
         """sort the current dataset"""
