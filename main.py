@@ -105,7 +105,7 @@ def main():
 
     arg = parser.parse_args()
 
-    CsvNexusShell(arg.input).cmdloop()
+    CSVShell(arg.input).cmdloop()
 
 
 if __name__ == '__main__':
