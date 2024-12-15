@@ -130,6 +130,7 @@ CSV-Nexus: sort
 Number of the column to sort: 2
 reverse the sort ?(y/n): n
 CSV-Nexus: view
+
 Name                 | Value1     | Value2     | Category       | Tag       
 ---------------------------------------------------------------------------
 Oranges              | 85.0       | 0.58       | Fruits         | sante     
